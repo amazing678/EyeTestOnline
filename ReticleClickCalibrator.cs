@@ -4,30 +4,30 @@ using UnityEngine.UI;
 public class ReticleClickCalibrator : MonoBehaviour
 {
     [Header("UI References")]
-    public Canvas canvas;                // ÄãµÄCanvas£¨½¨ÒéÍÏÉÏ£¬·½±ãÈ¡UI Camera£©
-    public RectTransform reticleRoot;    // ¾ÓÖĞ×ø±ê¸ù£ºlocal(0,0)=ÆÁÄ»ÖĞĞÄ
-    public RectTransform outerRing;      // ÓÃËüµÄ¡°¾ØĞÎ·¶Î§¡±ÅĞ¶¨Êó±ê½øÈë/ÒÆ³ö
-    public RectTransform targetCross;    // µã»÷ºó¹Ì¶¨
-    public RectTransform cursorCross;    // ½öÔÚouterRing·¶Î§ÄÚÏÔÊ¾
+    public Canvas canvas;                // ä½ çš„Canvasï¼ˆå»ºè®®æ‹–ä¸Šï¼Œæ–¹ä¾¿å–UI Cameraï¼‰
+    public RectTransform reticleRoot;    // å±…ä¸­åæ ‡æ ¹ï¼šlocal(0,0)=å±å¹•ä¸­å¿ƒ
+    public RectTransform outerRing;      // ç”¨å®ƒçš„â€œçŸ©å½¢èŒƒå›´â€åˆ¤å®šé¼ æ ‡è¿›å…¥/ç§»å‡º
+    public RectTransform targetCross;    // ç‚¹å‡»åå›ºå®š
+    public RectTransform cursorCross;    // ä»…åœ¨outerRingèŒƒå›´å†…æ˜¾ç¤º
 
     //private
-    // Äãµ±Ç°½Å±¾ËùÔÚµÄ Canvas£¨ÈôÊÇOverlay¿É²»Ìî£¬µ«½¨ÒéÌîÉÏ£©
+    // ä½ å½“å‰è„šæœ¬æ‰€åœ¨çš„ Canvasï¼ˆè‹¥æ˜¯Overlayå¯ä¸å¡«ï¼Œä½†å»ºè®®å¡«ä¸Šï¼‰
     //public Canvas canvas;
 
-    // ASeeTracker UI ¸ùÎïÌåÃû£¨¿ÉÄÜ´ø Clone£©
+    // ASeeTracker UI æ ¹ç‰©ä½“åï¼ˆå¯èƒ½å¸¦ Cloneï¼‰
     public string aseeUiName = "ASeeTracker_UI_Scipr(Clone)";
-    // Èç¹û³¡¾°ÀïÒ²¿ÉÄÜÊÇ·ÇClone
+    // å¦‚æœåœºæ™¯é‡Œä¹Ÿå¯èƒ½æ˜¯éClone
     public string aseeUiNameAlt = "ASeeTracker_UI_Scipr";
 
-    // ASeeTracker UI ÄÚ targetCross µÄÂ·¾¶£¨°´ÄãµÄ²ã¼¶¸Ä£©
-    // Àı£ºASeeTracker_UI_Scipr(Clone)/ReticleRoot/targetCross
-    public string aseeTargetCrossPath = "targetCross"; // ×î¼òµ¥£ºÖ±½Ó×ÓÎïÌå½Ğ targetCross
+    // ASeeTracker UI å†… targetCross çš„è·¯å¾„ï¼ˆæŒ‰ä½ çš„å±‚çº§æ”¹ï¼‰
+    // ä¾‹ï¼šASeeTracker_UI_Scipr(Clone)/ReticleRoot/targetCross
+    public string aseeTargetCrossPath = "targetCross"; // æœ€ç®€å•ï¼šç›´æ¥å­ç‰©ä½“å« targetCross
     public string aseeReticleRootPath = "GazePoint";     
 
     [Header("Options")]
     public bool hideSystemCursorWhenInside = true;
 
-    // µã»÷Æ«ÒÆ£¨Ïà¶ÔÖĞĞÄ0,0£©
+    // ç‚¹å‡»åç§»ï¼ˆç›¸å¯¹ä¸­å¿ƒ0,0ï¼‰
     public Vector2 savedOffsetLocal;
     public bool hasSavedPoint = false;
 
@@ -47,14 +47,14 @@ public class ReticleClickCalibrator : MonoBehaviour
     {
         Camera uiCam = GetUICamera();
 
-        // 1) ÊÇ·ñÔÚ outerRing µÄ¾ØĞÎ·¶Î§ÄÚ£¨²»°´Ô²ĞÎËã£©
+        // 1) æ˜¯å¦åœ¨ outerRing çš„çŸ©å½¢èŒƒå›´å†…ï¼ˆä¸æŒ‰åœ†å½¢ç®—ï¼‰
         bool insideOuterRect = RectTransformUtility.RectangleContainsScreenPoint(
             outerRing, Input.mousePosition, uiCam);
 
-        // 2) ½øÈë/ÒÆ³öÊ±ÇĞ»»Êó±êĞÎÌ¬
+        // 2) è¿›å…¥/ç§»å‡ºæ—¶åˆ‡æ¢é¼ æ ‡å½¢æ€
         SetCursorMode(insideOuterRect);
 
-        // 3) ¸üĞÂ cursorCross Î»ÖÃ£¨Ö»ÓĞÔÚ·¶Î§ÄÚ²ÅÏÔÊ¾£©
+        // 3) æ›´æ–° cursorCross ä½ç½®ï¼ˆåªæœ‰åœ¨èŒƒå›´å†…æ‰æ˜¾ç¤ºï¼‰
         if (insideOuterRect && cursorCross)
         {
             Vector2 localInRoot;
@@ -65,7 +65,7 @@ public class ReticleClickCalibrator : MonoBehaviour
             }
         }
 
-        // 4) ÔÚ·¶Î§ÄÚµã»÷£º¼ÇÂ¼Ïà¶ÔÖĞĞÄÆ«ÒÆ + ÒÆ¶¯targetCross£¨¸²¸ÇÉÏÒ»´Î£©
+        // 4) åœ¨èŒƒå›´å†…ç‚¹å‡»ï¼šè®°å½•ç›¸å¯¹ä¸­å¿ƒåç§» + ç§»åŠ¨targetCrossï¼ˆè¦†ç›–ä¸Šä¸€æ¬¡ï¼‰
         if (insideOuterRect && Input.GetMouseButtonDown(0))
         {
             Vector2 localInRoot;
@@ -76,7 +76,7 @@ public class ReticleClickCalibrator : MonoBehaviour
             }
         }
 
-        // 5) targetCross Ê¼ÖÕÏÔÊ¾ÔÚÉÏ´Îµã»÷´¦
+        // 5) targetCross å§‹ç»ˆæ˜¾ç¤ºåœ¨ä¸Šæ¬¡ç‚¹å‡»å¤„
         if (hasSavedPoint && targetCross)
         {
             if (!targetCross.gameObject.activeSelf)
@@ -87,36 +87,36 @@ public class ReticleClickCalibrator : MonoBehaviour
         }
     }
 
-    // ¡ï¡ï¡ï ĞÂÔö£ºÖØÖÃ×´Ì¬º¯Êı ¡ï¡ï¡ï
+    // â˜…â˜…â˜… æ–°å¢ï¼šé‡ç½®çŠ¶æ€å‡½æ•° â˜…â˜…â˜…
     public void ResetState()
     {
-        // 1. Çå³ı±êÖ¾Î»
+        // 1. æ¸…é™¤æ ‡å¿—ä½
         hasSavedPoint = false;
         savedOffsetLocal = Vector2.zero;
 
-        // 2. Òş²ØÒÑ¾­Ëø¶¨µÄÊ®×ÖÃé×¼Ïß£¨ÈÃÓÃ»§ÖªµÀĞèÒªÖØĞÂµã£©
+        // 2. éšè—å·²ç»é”å®šçš„åå­—ç„å‡†çº¿ï¼ˆè®©ç”¨æˆ·çŸ¥é“éœ€è¦é‡æ–°ç‚¹ï¼‰
         if (targetCross)
             targetCross.gameObject.SetActive(false);
 
-        // 3. Òş²ØÔ¶³Ì£¨ASeeTracker£©Ê®×Ö£¬·ÀÖ¹²ĞÁô
+        // 3. éšè—è¿œç¨‹ï¼ˆASeeTrackerï¼‰åå­—ï¼Œé˜²æ­¢æ®‹ç•™
         ResetRemoteTargetCross();
 
-        Debug.Log("ReticleClickCalibrator ÒÑÖØÖÃ£¬ÇëÖØĞÂÉè¶¨Æ«ÒÆµã");
+        Debug.Log("ReticleClickCalibrator å·²é‡ç½®ï¼Œè¯·é‡æ–°è®¾å®šåç§»ç‚¹");
     }
 
     private void SavePoint(Vector2 localInRoot)
     {
-        savedOffsetLocal = localInRoot;  // ¸²¸ÇÉÏÒ»´Î
+        savedOffsetLocal = localInRoot;  // è¦†ç›–ä¸Šä¸€æ¬¡
         hasSavedPoint = true;
 
-        Debug.Log($"Æ«ÒÆÁ¿:{savedOffsetLocal}");
+        Debug.Log($"åç§»é‡:{savedOffsetLocal}");
         if (targetCross)
         {
             targetCross.gameObject.SetActive(true);
             targetCross.anchoredPosition = savedOffsetLocal;
         }
 
-        // ¹Ø¼ü£ºÍ¬²½µ½ ASeeTracker_UI_Scipr ÏÂµÄ targetCross
+        // å…³é”®ï¼šåŒæ­¥åˆ° ASeeTracker_UI_Scipr ä¸‹çš„ targetCross
         SyncToASeeTrackerUI(savedOffsetLocal);
     }
 
@@ -131,10 +131,10 @@ public class ReticleClickCalibrator : MonoBehaviour
             Cursor.visible = true;
     }
 
-    // ¡ï ĞÂÔö£ºÖØÖÃÔ¶³ÌÊ®×Ö ¡ï
+    // â˜… æ–°å¢ï¼šé‡ç½®è¿œç¨‹åå­— â˜…
     private void ResetRemoteTargetCross()
     {
-        // ³¢ÊÔÕÒµ½Ô¶³Ì UI ²¢Òş²ØËüµÄ targetCross
+        // å°è¯•æ‰¾åˆ°è¿œç¨‹ UI å¹¶éšè—å®ƒçš„ targetCross
         RectTransform remoteTarget = FindRemoteTargetCross();
         if (remoteTarget != null)
         {
@@ -159,44 +159,44 @@ public class ReticleClickCalibrator : MonoBehaviour
 
     private void SyncToASeeTrackerUI(Vector2 savedOffsetLocalInMyRoot)
     {
-        // 1) ÕÒ Canvas
+        // 1) æ‰¾ Canvas
         GameObject canvasGO = GameObject.Find("Canvas");
         if (!canvasGO)
         {
-            Debug.LogWarning("Î´ÕÒµ½ Canvas");
+            Debug.LogWarning("æœªæ‰¾åˆ° Canvas");
             return;
         }
 
-        // 2) ÕÒ ASeeTracker_UI_Scipr(Clone) »ò ASeeTracker_UI_Scipr
+        // 2) æ‰¾ ASeeTracker_UI_Scipr(Clone) æˆ– ASeeTracker_UI_Scipr
         Transform aseeUI = canvasGO.transform.Find(aseeUiName);
         if (!aseeUI) aseeUI = canvasGO.transform.Find(aseeUiNameAlt);
         if (!aseeUI)
         {
-            Debug.LogWarning("Î´ÕÒµ½ ASeeTracker_UI_Scipr(Clone) »ò ASeeTracker_UI_Scipr");
+            Debug.LogWarning("æœªæ‰¾åˆ° ASeeTracker_UI_Scipr(Clone) æˆ– ASeeTracker_UI_Scipr");
             return;
         }
 
-        // 3) ÕÒËüÏÂÃæµÄ targetCross
+        // 3) æ‰¾å®ƒä¸‹é¢çš„ targetCross
         Transform targetT = string.IsNullOrEmpty(aseeTargetCrossPath) ? null : aseeUI.Find(aseeTargetCrossPath);
         if (!targetT)
         {
-            // ¶µµ×£ºÔÚ×Ó²ã¼¶ÀïÈ«¾ÖËÑ
+            // å…œåº•ï¼šåœ¨å­å±‚çº§é‡Œå…¨å±€æœ
             targetT = FindDeepChild(aseeUI, "targetCross");
         }
         if (!targetT)
         {
-            Debug.LogWarning("Î´ÕÒµ½ ASeeTracker_UI_Scipr ÏÂµÄ targetCross£¨Çë¼ì²éÂ·¾¶/ÃüÃû£©");
+            Debug.LogWarning("æœªæ‰¾åˆ° ASeeTracker_UI_Scipr ä¸‹çš„ targetCrossï¼ˆè¯·æ£€æŸ¥è·¯å¾„/å‘½åï¼‰");
             return;
         }
 
         RectTransform targetRT = targetT.GetComponent<RectTransform>();
         if (!targetRT)
         {
-            Debug.LogWarning("targetCross Ã»ÓĞ RectTransform");
+            Debug.LogWarning("targetCross æ²¡æœ‰ RectTransform");
             return;
         }
 
-        // 4) Ñ¡Ôñ¶Ô·½µÄ¡°×ø±ê¸ù¡±£ºÍ¨³£Ó¦¸ÃÊÇ¶Ô·½×Ô¼ºµÄReticleRoot£¨ÖĞĞÄÎª0,0£©
+        // 4) é€‰æ‹©å¯¹æ–¹çš„â€œåæ ‡æ ¹â€ï¼šé€šå¸¸åº”è¯¥æ˜¯å¯¹æ–¹è‡ªå·±çš„ReticleRootï¼ˆä¸­å¿ƒä¸º0,0ï¼‰
         RectTransform otherRoot = null;
         if (!string.IsNullOrEmpty(aseeReticleRootPath))
         {
@@ -205,27 +205,27 @@ public class ReticleClickCalibrator : MonoBehaviour
         }
         if (!otherRoot)
         {
-            // Ã»Ìá¹©¾ÍÄ¬ÈÏÓÃ ASeeTracker_UI_Scipr µÄRectTransform×÷Îª¸ù
+            // æ²¡æä¾›å°±é»˜è®¤ç”¨ ASeeTracker_UI_Scipr çš„RectTransformä½œä¸ºæ ¹
             otherRoot = aseeUI.GetComponent<RectTransform>();
         }
 
         if (!otherRoot)
         {
-            Debug.LogWarning("ASeeTracker_UI_Scipr Ã»ÓĞ RectTransform ×÷Îª×ø±ê¸ù");
+            Debug.LogWarning("ASeeTracker_UI_Scipr æ²¡æœ‰ RectTransform ä½œä¸ºåæ ‡æ ¹");
             return;
         }
 
-        // 5) °Ñ¡°ÎÒÕâ±ßµÄ local offset¡±×ª³ÉÆÁÄ»×ø±ê
-        //    ×¢Òâ£ºsavedOffsetLocalInMyRoot ÊÇÔÚ reticleRoot ×ø±êÏµÏÂµÄ anchoredPosition
+        // 5) æŠŠâ€œæˆ‘è¿™è¾¹çš„ local offsetâ€è½¬æˆå±å¹•åæ ‡
+        //    æ³¨æ„ï¼šsavedOffsetLocalInMyRoot æ˜¯åœ¨ reticleRoot åæ ‡ç³»ä¸‹çš„ anchoredPosition
         Camera uiCam = GetUICamera();
         Vector3 myWorld = reticleRoot.TransformPoint(savedOffsetLocalInMyRoot);
         Vector2 screenPos = RectTransformUtility.WorldToScreenPoint(uiCam, myWorld);
 
-        // 6) ÔÙ°ÑÆÁÄ»×ø±ê×ª³É¶Ô·½ root µÄ local£¬²¢ÒÆ¶¯¶Ô·½ targetCross
+        // 6) å†æŠŠå±å¹•åæ ‡è½¬æˆå¯¹æ–¹ root çš„ localï¼Œå¹¶ç§»åŠ¨å¯¹æ–¹ targetCross
         Vector2 otherLocal;
         if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(otherRoot, screenPos, uiCam, out otherLocal))
         {
-            Debug.LogWarning("ÎŞ·¨½«ÆÁÄ»×ø±ê×ª»»µ½ ASeeTracker µÄ×ø±ê¸ù");
+            Debug.LogWarning("æ— æ³•å°†å±å¹•åæ ‡è½¬æ¢åˆ° ASeeTracker çš„åæ ‡æ ¹");
             return;
         }
 
@@ -237,13 +237,13 @@ public class ReticleClickCalibrator : MonoBehaviour
 
     private Camera GetUICamera()
     {
-        // Screen Space - Overlay£º´«null
-        // Screen Space - Camera / World Space£ºÓÃcanvas.worldCamera
+        // Screen Space - Overlayï¼šä¼ null
+        // Screen Space - Camera / World Spaceï¼šç”¨canvas.worldCamera
         if (canvas == null) return null;
         return (canvas.renderMode == RenderMode.ScreenSpaceOverlay) ? null : canvas.worldCamera;
     }
 
-    // ====== µİ¹éÕÒ×ÓÎïÌå£¨¶µµ×ÓÃ£©======
+    // ====== é€’å½’æ‰¾å­ç‰©ä½“ï¼ˆå…œåº•ç”¨ï¼‰======
     private Transform FindDeepChild(Transform parent, string name)
     {
         foreach (Transform child in parent)
