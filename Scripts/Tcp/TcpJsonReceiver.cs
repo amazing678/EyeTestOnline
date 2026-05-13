@@ -1,48 +1,26 @@
 using System;
+using System.IO;
 using System.Net;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
-using Newtonsoft.Json;
+using Newtonsoft.Json.Linq; // ä½¿ç”¨ JObject åŠ¨æ€è§£æ
 
 public class TcpJsonServer : MonoBehaviour
 {
-    [Header("Ä£Ê½¿ª¹Ø")]
-    [SerializeField] private bool useLocalhostOnly = false; // true: 127.0.0.1  false: 0.0.0.0
+    [Header("Web API è®¾ç½®")]
+    [SerializeField] private string baseApiUrl = "http://127.0.0.1:9620/amd-eeg-eyes-tracking";
+    [SerializeField] private string sseEndpoint = "/sseApi/sseGameConnect";
 
-    [Header("·şÎñÆ÷ÅäÖÃ")]
-    [SerializeField] private int port = 9090;
-
-    [Tooltip("¿çÉè±¸Ä£Ê½ÏÂµÄ°ó¶¨µØÖ·£¬Ä¬ÈÏ 0.0.0.0")]
-    [SerializeField] private string remoteBindAddress = "0.0.0.0";
-
-    [Tooltip("±¾µØÄ£Ê½°ó¶¨µØÖ·£¬¹Ì¶¨ 127.0.0.1")]
-    [SerializeField] private string localhostBindAddress = "127.0.0.1";
-
-    private TcpListener server;
-    private TcpClient currentClient;
-    private NetworkStream stream;
     private Thread listenThread;
     private volatile bool isRunning;
-
-    private readonly StringBuilder _recvBuf = new StringBuilder();
-
-    [Serializable]
-    public class MessageData
-    {
-        public int attention;
-        public int meditation;
-        public long timestamp;
-    }
-
-    private string CurrentBindAddress => useLocalhostOnly ? localhostBindAddress : remoteBindAddress;
+    private HttpWebRequest currentRequest;
 
     void Start()
     {
         if (MainThreadDispatcher.Instance == null)
         {
-            Debug.LogError("³¡¾°ÖĞÈ±ÉÙ MainThreadDispatcher£¬ÇëÌí¼Óµ½ÈÎÒâGameObjectÉÏ£¡");
+            Debug.LogError("åœºæ™¯ä¸­ç¼ºå°‘ MainThreadDispatcherï¼Œè¯·æ·»åŠ åˆ°ä»»æ„GameObjectä¸Šï¼");
             enabled = false;
             return;
         }
@@ -52,16 +30,6 @@ public class TcpJsonServer : MonoBehaviour
     void OnDestroy()
     {
         StopServer();
-    }
-
-    /// <summary>
-    /// ¸ø UI Toggle µ÷ÓÃ£ºtrue=±¾µØ(127.0.0.1)£¬false=¿çÉè±¸(0.0.0.0)
-    /// </summary>
-    public void SetUseLocalhostOnly(bool enabled)
-    {
-        if (useLocalhostOnly == enabled) return;
-        useLocalhostOnly = enabled;
-        RestartServer();
     }
 
     public void RestartServer()
@@ -75,7 +43,7 @@ public class TcpJsonServer : MonoBehaviour
         if (isRunning) return;
 
         isRunning = true;
-        listenThread = new Thread(ListenAndReceive);
+        listenThread = new Thread(ListenSSE);
         listenThread.IsBackground = true;
         listenThread.Start();
     }
@@ -83,18 +51,12 @@ public class TcpJsonServer : MonoBehaviour
     public void StopServer()
     {
         if (!isRunning) return;
-
         isRunning = false;
 
-        // ¹Ø¼ü£ºÏÈ Stop() ´ò¶Ï AcceptTcpClient µÄ×èÈû
-        try { server?.Stop(); } catch { }
-        server = null;
-
-        CloseClient();
+        try { currentRequest?.Abort(); } catch { }
 
         if (listenThread != null && listenThread.IsAlive)
         {
-            // ¸øÒ»¸ö³¬Ê±£¬±ÜÃâ±à¼­Æ÷ÍË³ö¿¨×¡
             if (!listenThread.Join(500))
             {
                 try { listenThread.Interrupt(); } catch { }
@@ -103,127 +65,108 @@ public class TcpJsonServer : MonoBehaviour
         listenThread = null;
     }
 
-    private void ListenAndReceive()
+    private void ListenSSE()
     {
         try
         {
-            string bind = CurrentBindAddress;
-            IPAddress ip = IPAddress.Parse(bind);
+            string url = baseApiUrl + sseEndpoint;
+            currentRequest = (HttpWebRequest)WebRequest.Create(url);
+            currentRequest.Method = "GET";
+            // currentRequest.Accept = "text/event-stream"; // æ ‡å‡† SSE
+            currentRequest.Timeout = Timeout.Infinite; // ä¿æŒé•¿è¿æ¥
 
-            server = new TcpListener(ip, port);
-            server.Start();
-            Debug.Log($"·şÎñÆ÷ÒÑÆô¶¯£¬¼àÌı {bind}:{port} £¨useLocalhostOnly={useLocalhostOnly}£©");
+            Debug.Log("æ­£åœ¨è¿æ¥ SSE æœåŠ¡å™¨: " + url);
 
-            while (isRunning)
+            using (WebResponse response = currentRequest.GetResponse())
+            using (Stream stream = response.GetResponseStream())
+            using (StreamReader reader = new StreamReader(stream, Encoding.UTF8))
             {
-                try
+                Debug.Log("SSE æµå·²è¿æ¥æˆåŠŸï¼");
+
+                while (isRunning && !reader.EndOfStream)
                 {
-                    currentClient = server.AcceptTcpClient(); // StopServer »á´ò¶ÏÕâÀï
-                }
-                catch (SocketException se)
-                {
-                    // Õı³£Í£Ö¹£¨Windows ³£¼û 10004£©
-                    if (!isRunning || se.ErrorCode == 10004) return;
-                    throw;
-                }
+                    string line = reader.ReadLine();
+                    if (string.IsNullOrWhiteSpace(line)) continue;
 
-                Debug.Log("¿Í»§¶ËÒÑÁ¬½Ó");
-                stream = currentClient.GetStream();
-                byte[] buffer = new byte[1024];
-                _recvBuf.Clear();
+                    // è§£ææ ‡å‡† SSE æ ¼å¼ (é€šå¸¸ä»¥ data: å¼€å¤´ï¼Œæœ‰äº›åå°ç›´æ¥æ¨çº¯ json)
+                    string jsonStr = line.StartsWith("data:") ? line.Substring(5).Trim() : line.Trim();
 
-                while (isRunning && currentClient.Connected)
-                {
-                    int bytesRead = 0;
-                    try
+                    if (jsonStr.StartsWith("{"))
                     {
-                        bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    }
-                    catch (SocketException se)
-                    {
-                        if (!isRunning || se.ErrorCode == 10004) break;
-                        throw;
-                    }
-                    catch (ObjectDisposedException)
-                    {
-                        break;
-                    }
-
-                    if (bytesRead <= 0) break;
-
-                    string chunk = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    _recvBuf.Append(chunk);
-
-                    // °´ '\n' ÇĞ·Ö£¨¼æÈİ \r\n£©
-                    while (true)
-                    {
-                        string all = _recvBuf.ToString();
-                        int nl = all.IndexOf('\n');
-                        if (nl < 0) break;
-
-                        string line = all.Substring(0, nl).Trim();
-                        string rest = all.Substring(nl + 1);
-
-                        _recvBuf.Clear();
-                        _recvBuf.Append(rest);
-
-                        if (!string.IsNullOrEmpty(line))
-                            ParseJsonData(line);
+                        ParseJsonData(jsonStr);
                     }
                 }
-
-                // Ö»¹Ø±Õ¿Í»§¶Ë£¬²»Í£Ö¹ server£¨ÔÊĞíÏÂÒ»Ì¨Éè±¸¼ÌĞøÁ¬£©
-                CloseClient();
             }
+        }
+        catch (ThreadInterruptedException) { }
+        catch (WebException wex)
+        {
+            if (isRunning) Debug.LogWarning("SSE ç½‘ç»œå¼‚å¸¸æˆ–æ–­å¼€: " + wex.Message);
         }
         catch (Exception ex)
         {
-            if (!isRunning) return;
-            Debug.LogError("TCP·şÎñÆ÷´íÎó: " + ex);
+            if (isRunning) Debug.LogError("SSE æ¥æ”¶é”™è¯¯: " + ex);
         }
         finally
         {
-            try { server?.Stop(); } catch { }
-            server = null;
-            CloseClient();
+            currentRequest = null;
+            if (isRunning)
+            {
+                Debug.Log("SSE è¿æ¥å·²æ–­å¼€ï¼Œå°è¯•é‡è¿...");
+                Thread.Sleep(2000); // æ–­çº¿åç­‰å¾…2ç§’é‡è¿
+                if (isRunning) ListenSSE();
+            }
         }
-    }
-
-    private void CloseClient()
-    {
-        try { stream?.Close(); } catch { }
-        stream = null;
-
-        try { currentClient?.Close(); } catch { }
-        currentClient = null;
     }
 
     private void ParseJsonData(string json)
     {
         try
         {
-            MessageData data = JsonConvert.DeserializeObject<MessageData>(json);
-            if (data != null)
+            JObject data = JObject.Parse(json);
+            int type = data["type"]?.Value<int>() ?? 0;
+            int subType = data["subType"]?.Value<int>() ?? 0;
+
+            if (type == 3)
             {
-                MainThreadDispatcher.Enqueue(() => ProcessReceivedData(data));
+                JToken content = data["content"];
+                if (content == null) return;
+
+                if (subType == 3206) //çœ¼åŠ¨æ•°æ®
+                {
+                    float gazeX = content["gazeX"]?.Value<float>() ?? 0f;
+                    float gazeY = content["gazeY"]?.Value<float>() ?? 0f;
+
+                    MainThreadDispatcher.Enqueue(() => {
+                        if (EyeTrackerController_prefab.Instance != null)
+                        {
+                            EyeTrackerController_prefab.Instance.UpdateNetworkGaze(gazeX, gazeY);
+                        }
+                    });
+                }
+                else if (subType == 3207) //è„‘ç”µæ•°æ®
+                {
+                    int attention = content["attention"]?.Value<int>() ?? 0;
+
+                    MainThreadDispatcher.Enqueue(() => {
+                        // 1. å®æ—¶æ›´æ–° Text æ–‡æœ¬
+                        if (AttentionUIText.Instance != null)
+                            AttentionUIText.Instance.UpdateAttentionText(attention);
+
+                        // 2. æ›´æ–°æ¨¡ç³Š UI æ•ˆæœ
+                        if (AttentionBlurUI.Instance != null)
+                            AttentionBlurUI.Instance.SetAttention(attention);
+
+                        // â˜… 3. é€šçŸ¥ ButtonEvent æ•°æ®å·²åˆ°è¾¾ï¼Œè‡ªåŠ¨ç‚¹äº®ç»¿ç¯ â˜…
+                        if (ButtonEvent.Instance != null)
+                            ButtonEvent.Instance.OnReceiveEEGData();
+                    });
+                }
             }
         }
-        catch (JsonException ex)
+        catch (Exception ex)
         {
-            Debug.LogError("JSON½âÎö´íÎó: " + ex.Message);
-            Debug.LogError("´íÎóµÄJSONÄÚÈİ: " + json);
+            Debug.LogError("JSONè§£æé”™è¯¯: " + ex.Message + "\né”™è¯¯å†…å®¹: " + json);
         }
-    }
-
-    private void ProcessReceivedData(MessageData data)
-    {
-        int attentionValue = data.attention;
-        // Debug.Log($"´¦ÀíÊı¾İ - ×¢ÒâÁ¦: {data.attention}, Ú¤ÏëÖµ: {data.meditation}, Ê±¼ä´Á: {data.timestamp}");
-
-        if (AttentionUIText.Instance != null)
-            AttentionUIText.Instance.UpdateAttentionText(attentionValue);
-
-        if (AttentionBlurUI.Instance != null)
-            AttentionBlurUI.Instance.SetAttention(attentionValue);
     }
 }
