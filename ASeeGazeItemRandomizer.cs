@@ -2,69 +2,48 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Networking; // â˜… æ–°å¢ï¼šç”¨äºå‘é€ HTTP è¯·æ±‚
+using System.Text;            // â˜… æ–°å¢
 
 public class ASeeGazeItemRandomizer : MonoBehaviour
 {
+    [Header("Web API Settings")]
+    public string baseApiUrl = "http://127.0.0.1:9620/amd-eeg-eyes-tracking";
+
     [Header("Find Targets")]
     public string canvasName = "Canvas";
     public string aseeUiName = "ASeeTracker_UI_Scipr(Clone)";
-    public string aseeUiNameAlt = "ASeeTracker_UI_Scipr"; // ¶µµ×
+    public string aseeUiNameAlt = "ASeeTracker_UI_Scipr";
 
-    [Tooltip("ASeeTracker_UI_Scipr(Clone) ÏÂ gazePoint µÄÂ·¾¶£¬ÀıÈç£ºReticleRoot/gazePoint£»Áô¿ÕÔòÉî¶ÈËÑË÷Ãû×Ö gazePoint")]
     public string gazePointPath = "";
-
-    [Tooltip("gazePoint ÏÂ targetCross µÄÂ·¾¶£¬ÀıÈç£ºtargetCross£»Áô¿ÕÔòÉî¶ÈËÑË÷Ãû×Ö targetCross")]
     public string targetCrossPath = "targetCross";
 
     [Header("Follow Switch")]
-    [Tooltip("¿ªÆô£ºgazePoint ¸úËæÊó±ê£»¹Ø±Õ£ºÓÉÍâ²¿(ÑÛ¶¯)Çı¶¯ gazePoint£¬±¾½Å±¾Ö»×ö¼ì²â")]
     public bool followMouse = true;
 
     [Header("Items (UI Images)")]
-    [Tooltip("ÒªËæ»úÒÆ¶¯µÄÎïÆ·RectTransformÁĞ±í¡£ÈôÎª¿Õ£¬¿ÉÓÃ itemsContainerName ×Ô¶¯ÊÕ¼¯¡£")]
     public List<RectTransform> itemRects = new List<RectTransform>();
-
-    [Tooltip("Èç¹û itemRects Îª¿Õ£¬ÔòÔÚ Canvas ÏÂÕÒÕâ¸öÈİÆ÷²¢ÊÕ¼¯Æä×ÓÎïÌå RectTransform ×÷ÎªÎïÆ·")]
     public string itemsContainerName = "Items";
 
     [Header("Placement Area")]
-    [Tooltip("ÎïÆ·Ëæ»ú°Ú·ÅµÄ²Î¿¼ÇøÓò£¨Í¨³£¾ÍÊÇÎïÆ·¸¸ÈİÆ÷£©¡£²»ÌîÔòÄ¬ÈÏÓÃCanvas RectTransform¡£")]
     public RectTransform placementArea;
-
-    [Tooltip("±ßÔµÁô°×£¨ÏñËØ£©£¬±ÜÃâÎïÆ·³ö½ç")]
     public float padding = 20f;
 
     [Header("Dwell Trigger")]
-    [Tooltip("Í£Áô³¬¹ı¸ÃÊ±¼ä£¨Ãë£©´¥·¢£ºÎïÆ·ÏûÊ§²¢Ëæ»ú»»Î»ÔÙ³öÏÖ")]
     public float dwellTime = 2.0f;
-
-    [Tooltip("´¥·¢ºóÎïÆ·ÏûÊ§¶à¾ÃÔÙ³öÏÖ£¨Ãë£©£¬0±íÊ¾Á¢¼´»»Î»³öÏÖ")]
     public float respawnDelay = 0.0f;
 
-    [Header("Proximity Audio (ĞÂ¹¦ÄÜ)")]
-    [Tooltip("ÌáÊ¾ÒôĞ§£¨µÎ£©")]
+    [Header("Proximity Audio")]
     public AudioClip beepClip;
-
-    [Tooltip("×îÂıÆµÂÊ£¨Ãë£©£º¾àÀëºÜÔ¶Ê±£¬¶à¾ÃÏìÒ»´Î")]
-    public float maxBeepInterval = 1.0f; // Âı
-
-    [Tooltip("×î¿ìÆµÂÊ£¨Ãë£©£º¾àÀë·Ç³£½üÊ±£¬¶à¾ÃÏìÒ»´Î")]
-    public float minBeepInterval = 0.02f; // ¿ì
-
-    [Tooltip("×î´ó¸ĞÓ¦¾àÀë£¨ÏñËØ£©£º³¬¹ıÕâ¸ö¾àÀë±£³Ö×îÂıÆµÂÊ£¬Ğ¡ÓÚÕâ¸ö¾àÀë¿ªÊ¼±ä¿ì")]
+    public float maxBeepInterval = 1.0f;
+    public float minBeepInterval = 0.02f;
     public float maxDistanceForSound = 800f;
-
-    [Tooltip("×î´óÒôÁ¿")]
     [Range(0, 1)] public float beepVolume = 1.0f;
-
-    [Tooltip("×îĞ¡ÒôÁ¿")]
     [Range(0, 1)] public float minBeepVolume = 0.1f;
 
     [Header("Debug Info (Read Only)")]
-    [SerializeField] private float debugCurrentDistance; // µ±Ç°¾àÀë
-    [SerializeField] private float debugCalculatedVolume; // µ±Ç°¼ÆËã³öµÄÒôÁ¿
-    [SerializeField] private float debugCalculatedInterval;//ÏÔÊ¾ÉùÒôÆµÂÊ
-
+    [SerializeField] private float debugCurrentDistance;
+    [SerializeField] private float debugCalculatedVolume;
 
     // ===== runtime refs =====
     private Canvas canvas;
@@ -75,18 +54,15 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
     private RectTransform gazePoint;
     private RectTransform targetCross;
 
-    // dwell tracking
     private RectTransform currentHoveredItem = null;
     private float hoverStartTime = 0f;
     private bool respawning = false;
 
-    // Audio
     private AudioSource audioSource;
     private float lastBeepTime = 0f;
 
     void Start()
     {
-        //·ÀÖ¹Ã»ÓĞAUDIO×é¼şµ¼ÖÂ±¨´í
         audioSource = GetComponent<AudioSource>();
         if (audioSource == null)
         {
@@ -99,14 +75,12 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
 
     void Update()
     {
-        // Èİ´í£ºASee UI ¿ÉÄÜÍíÉú³É
         if (aseeUI == null || gazePoint == null || targetCross == null || canvasRect == null)
         {
             TryBindAll();
             if (gazePoint == null || targetCross == null || canvasRect == null) return;
         }
 
-        // 1) ¿ÉÑ¡£ºgazePoint ¸úËæÊó±ê£¨¹Ø±ÕÔò²»¸Ä¶¯ gazePoint£¬Íâ²¿¿ÉÓÃÑÛ¶¯Çı¶¯Ëü£©
         if (followMouse)
         {
             Vector2 localInGazeParent;
@@ -117,26 +91,20 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
             }
         }
 
-        // 2) ¼ÆËã targetCross ¡°ÖĞĞÄµã¡±µÄÆÁÄ»×ø±ê£¨²»ÒÀÀµpivotÊÇ·ñÖĞĞÄ£©
         Vector2 targetCenterScreen = GetRectTransformCenterScreen(targetCross);
 
-        // 3) ´¦ÀíÉùÒôÂß¼­ (Proximity Beep)
         HandleProximitySound(targetCenterScreen);
 
-        // 4) ÕÒµ±Ç°ÃüÖĞµÄÎïÆ·£¨¾ØĞÎÃüÖĞ£©
         RectTransform hovered = GetHoveredItem(targetCenterScreen);
 
-        // 5) Í£Áô¼ÆÊ±Âß¼­
         if (respawning)
         {
-            // ÕıÔÚÖØÉúÊ±£¬²»¼ÆÊ±²»´¥·¢
             currentHoveredItem = null;
             return;
         }
 
         if (hovered == null)
         {
-            // Àë¿ªËùÓĞÎïÆ·£ºÇå¿Õ¼ÆÊ±
             currentHoveredItem = null;
             hoverStartTime = 0f;
             return;
@@ -144,59 +112,39 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
 
         if (hovered != currentHoveredItem)
         {
-            // ÇĞ»»µ½ĞÂÎïÆ·£ºÖØĞÂ¼ÆÊ±
             currentHoveredItem = hovered;
             hoverStartTime = Time.unscaledTime;
             return;
         }
 
-        // Í¬Ò»¸öÎïÆ·ÉÏ³ÖĞøÍ£Áô
         float t = Time.unscaledTime - hoverStartTime;
         if (t >= dwellTime)
         {
-            // ´¥·¢£º¸ÃÎïÆ·ÏûÊ§ -> Ëæ»ú»»Î» -> ÔÙ³öÏÖ
             StartCoroutine(RespawnAndRelocate(currentHoveredItem));
             currentHoveredItem = null;
             hoverStartTime = 0f;
         }
     }
 
-    // =========================
-    // Audio Logic
-    // =========================
     private void HandleProximitySound(Vector2 gazeScreenPos)
     {
         if (beepClip == null || respawning) return;
 
-        // ÕÒµ½µ±Ç°¼¤»îµÄÄ¿±ê£¨²İİ®£©
         RectTransform activeTarget = GetActiveTarget();
-
         if (activeTarget == null) return;
 
-        // »ñÈ¡Ä¿±êµÄÆÁÄ»×ø±ê
         Vector2 itemScreenPos = GetRectTransformCenterScreen(activeTarget);
-
-        // ¼ÆËã¾àÀë
         float distance = Vector2.Distance(gazeScreenPos, itemScreenPos);
         debugCurrentDistance = distance;
 
-        // ¸ù¾İ¾àÀë¼ÆËã²¥·Å¼ä¸ô (Lerp)
-        // ¾àÀëÔ½´ó t Ô½½Ó½ü 1£¬¼ä¸ôÔ½´ó(Âı)
-        // ¾àÀëÔ½Ğ¡ t Ô½½Ó½ü 0£¬¼ä¸ôÔ½Ğ¡(¿ì)
         float t = Mathf.Clamp01(distance / maxDistanceForSound);
-        //ÆµÂÊ
         float currentInterval = Mathf.Lerp(minBeepInterval, maxBeepInterval, t);
-        //ÒôÁ¿
         float volumeFactor = (1.0f - t) * (1.0f - t);
         float currentVolume = Mathf.Lerp(minBeepVolume, beepVolume, volumeFactor);
 
-        // ½«¼ÆËã½á¹ûÏÔÊ¾ÔÚÃæ°åÉÏ
         debugCalculatedVolume = currentVolume;
-
-        // ¡ï¹Ø¼üĞŞ¸Ä¡ï£ºÖ±½ÓÉèÖÃ AudioSource µÄÒôÁ¿ÊôĞÔ£¬ÕâÑùÄãÔÚ Inspector Ãæ°åÄÜ¿´µ½»¬ÌõÔÚ¶¯
         audioSource.volume = currentVolume;
 
-        // ²¥·ÅÂß¼­
         if (Time.time - lastBeepTime >= currentInterval)
         {
             audioSource.PlayOneShot(beepClip, 1f);
@@ -207,7 +155,6 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
     private RectTransform GetActiveTarget()
     {
         if (itemRects == null) return null;
-        // ·µ»ØµÚÒ»¸ö´¦ÓÚ¼¤»î×´Ì¬µÄ Item
         foreach (var item in itemRects)
         {
             if (item != null && item.gameObject.activeInHierarchy)
@@ -216,10 +163,6 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
         return null;
     }
 
-
-    // =========================
-    // Bind / Find
-    // =========================
     private void TryBindAll()
     {
         GameObject canvasGO = GameObject.Find(canvasName);
@@ -229,13 +172,11 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
         canvasRect = canvasGO.GetComponent<RectTransform>();
         uiCam = GetUICamera(canvas);
 
-        // ÕÒ ASee UI
         Transform aseeT = canvasGO.transform.Find(aseeUiName);
         if (!aseeT) aseeT = canvasGO.transform.Find(aseeUiNameAlt);
         if (!aseeT) return;
         aseeUI = aseeT.GetComponent<RectTransform>();
 
-        // ÕÒ gazePoint
         gazePoint = null;
         if (!string.IsNullOrEmpty(gazePointPath))
         {
@@ -248,7 +189,6 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
             if (gp) gazePoint = gp.GetComponent<RectTransform>();
         }
 
-        // ÕÒ targetCross£¨ÔÚ gazePoint ÏÂ£©
         targetCross = null;
         if (gazePoint)
         {
@@ -265,10 +205,8 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
             }
         }
 
-        // placementArea
         if (!placementArea) placementArea = canvasRect;
 
-        // items auto collect
         if (itemRects == null) itemRects = new List<RectTransform>();
         if (itemRects.Count == 0)
         {
@@ -307,9 +245,6 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
         }
     }
 
-    // =========================
-    // Hover / Hit
-    // =========================
     private RectTransform GetHoveredItem(Vector2 screenPoint)
     {
         if (itemRects == null || itemRects.Count == 0) return null;
@@ -327,32 +262,62 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
 
     private Vector2 GetRectTransformCenterScreen(RectTransform rt)
     {
-        // ÓÃ rect.center »ñÈ¡¡°¾ØĞÎÖĞĞÄµã¡±£¬ÔÙ TransformPoint µ½ÊÀ½ç×ø±ê
         Vector3 worldCenter = rt.TransformPoint(rt.rect.center);
         return RectTransformUtility.WorldToScreenPoint(uiCam, worldCenter);
     }
 
     // =========================
-    // Respawn & Relocate
+    // â˜… æ ¸å¿ƒä¿®æ”¹ï¼šå‘ API æ¨é€ç‰©å“æ˜¾éšäº‹ä»¶
     // =========================
     private IEnumerator RespawnAndRelocate(RectTransform item)
     {
         if (!item || !placementArea) yield break;
         respawning = true;
 
-        // 1) ÏûÊ§
-        item.gameObject.SetActive(false);
+        // 1) é€šçŸ¥æœåŠ¡å™¨ï¼šç‰©ä½“æ¶ˆå¤±
+        StartCoroutine(PostObjectEvent("/eventApi/objDisappear", item.gameObject.name));
+
+        item.gameObject.SetActive(false); // æ¶ˆå¤±
 
         if (respawnDelay > 0f)
             yield return new WaitForSecondsRealtime(respawnDelay);
 
-        // 2) Ëæ»ú»»Î»ÖÃ£¨°ÑËæ»úµã¶¨ÒåÔÚ placementArea ÄÚ£©
+        // 2) éšæœºæ¢ä½ç½®
         PlaceItemRandomly(item, placementArea);
 
-        // 3) ³öÏÖ
+        // 3) å‡ºç°
         item.gameObject.SetActive(true);
 
+        // é€šçŸ¥æœåŠ¡å™¨ï¼šç‰©ä½“å‡ºç°
+        StartCoroutine(PostObjectEvent("/eventApi/objAppear", item.gameObject.name));
+
         respawning = false;
+    }
+
+    // â˜… å‘é€ HTTP POST çš„åç¨‹
+    private IEnumerator PostObjectEvent(string endpoint, string objName)
+    {
+        string url = baseApiUrl + endpoint;
+        string jsonPayload = $"{{\"objName\": \"{objName}\"}}"; // æ„é€ JSON {"objName": "ç‰©ä½“åå­—"}
+
+        using (UnityWebRequest request = new UnityWebRequest(url, "POST"))
+        {
+            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonPayload);
+            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+            request.downloadHandler = new DownloadHandlerBuffer();
+            request.SetRequestHeader("Content-Type", "application/json");
+
+            yield return request.SendWebRequest();
+
+            if (request.result != UnityWebRequest.Result.Success)
+            {
+                Debug.LogError($"[API æ¨é€å¤±è´¥] URL: {url} \né”™è¯¯: {request.error}");
+            }
+            else
+            {
+                Debug.Log($"[API æ¨é€æˆåŠŸ] URL: {url} \nå‚æ•°: {jsonPayload} \nè¿”å›: {request.downloadHandler.text}");
+            }
+        }
     }
 
     private void PlaceItemRandomly(RectTransform item, RectTransform area)
@@ -360,17 +325,14 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
         RectTransform parent = item.parent as RectTransform;
         if (!parent) return;
 
-        // area ¾Ö²¿¿Õ¼äÏÂµÄ¿ÉÓÃ·¶Î§
         Rect ar = area.rect;
 
         float halfW = item.rect.width * 0.5f;
         float halfH = item.rect.height * 0.5f;
 
-        // ¼ÆËãÆÁÄ»/ÇøÓò¿í¸ßµÄ 1/6 ×÷ÎªÇ¿ÖÆÁô°×
         float marginX = ar.width / 6.0f;
         float marginY = ar.height / 6.0f;
 
-        // minX = ×ó±ß½ç + 1/6¿í + padding + ÎïÆ·°ë¿í
         float minX = ar.xMin + marginX + padding + halfW;
         float maxX = ar.xMax - marginX - padding - halfW;
         float minY = ar.yMin + marginY + padding + halfH;
@@ -382,30 +344,9 @@ public class ASeeGazeItemRandomizer : MonoBehaviour
         float x = Random.Range(minX, maxX);
         float y = Random.Range(minY, maxY);
 
-        // Ëæ»úµãÏÈÔÚ area µÄ¾Ö²¿×ø±ê
         Vector3 worldPos = area.TransformPoint(new Vector3(x, y, 0f));
         Vector3 localInParent = parent.InverseTransformPoint(worldPos);
 
         item.anchoredPosition = new Vector2(localInParent.x, localInParent.y);
-    }
-
-    // =========================
-    // Íâ²¿½Ó¿Ú£ºµ± followMouse=false Ê±£¬¿ÉÓÉÑÛ¶¯Çı¶¯ gazePoint
-    // =========================
-    public void SetGazePointFromScreen(Vector2 screenPx)
-    {
-        if (!gazePoint) return;
-        Vector2 localInParent;
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
-                (RectTransform)gazePoint.parent, screenPx, uiCam, out localInParent))
-        {
-            gazePoint.anchoredPosition = localInParent;
-        }
-    }
-
-    public void SetGazePointFromNormalized(Vector2 gaze01)
-    {
-        Vector2 px = new Vector2(gaze01.x * Screen.width, gaze01.y * Screen.height);
-        SetGazePointFromScreen(px);
     }
 }
