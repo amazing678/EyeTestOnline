@@ -1,447 +1,175 @@
 using System.Collections;
-using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Networking;
 
 public class ButtonEvent : MonoBehaviour
 {
-    [Header("UI References")]
-    public GameObject WraningUI_1, WraningUI_2, WraningUI_3, WraningUI_4, WraningUI_5;
+    public static ButtonEvent Instance;
 
-    EyeTrackerController eyeTrackerController;
+    [Header("ç•Œé¢å¼•ç”¨ (UI References)")]
+    public GameObject StartUI;
+    public GameObject SettingUI;
+    public GameObject TrainUI;
 
-    public GameObject StartUI, SettingUI, TrainUI;
+    [Header("è­¦å‘Šå¼¹çª— (Warnings)")]
+    public GameObject WraningUI_3;
+    public GameObject WraningUI_4;
 
-    //ÇĞ»»½¡¿µĞ¡ÅóÓÑµÄ¿ª¹Ø
+    [Header("åŠŸèƒ½å¼€å…³")]
     public Toggle fastModeToggle;
+    public Toggle debugModeToggle;
 
-    // ¼ÇÂ¼ÄÔµçÁ¬½Ó×´Ì¬
-    private bool isEEGConnected = false;
-    // ·ÀÖ¹ÓÃ»§ÔÚÁ¬½Ó¹ı³ÌÖĞ¿ñµã°´Å¥ (ĞÂÔö)
-    private bool isConnecting = false;
-
-    // ·şÎñÆ÷µØÖ·ºÍÉè±¸Ãû
-    //private const string EEG_API_URL = "http://127.0.0.1:8080/api/connect";
-    private const string EEG_DEVICE_NAME = "HR-S0A9265";
-    [Header("EEG Network Settings")]
-    [Tooltip("ÍÏÈëÄÇ¸öÓÃÀ´ÇĞ»»±¾µØ/Ô¶¶ËµÄ Toggle")]
-    public Toggle eegLocalToggle;
-
-    // ¶¯Ì¬»ñÈ¡µ±Ç°µÄ API µØÖ·
-    private string CurrentEegApiUrl
-    {
-        get
-        {
-            // Èç¹ûÈ¡Ïû¹´Ñ¡ÁË±¾µØÁ¬½Ó£¬ÔòÈ¥Á¬½Ó 192.168.10.22
-            if (eegLocalToggle != null && !eegLocalToggle.isOn)
-            {
-                return "http://192.168.10.22:8080/api/connect";
-            }
-            // ·ñÔòÄ¬ÈÏÁ¬½Ó±¾µØ
-            return "http://127.0.0.1:8080/api/connect";
-        }
-    }
-
-    public ReticleClickCalibrator reticleCalibrator;
-
-    [Header("EEG Status Indicator")]
-    [Tooltip("ÓÃÀ´ÏÔÊ¾ÄÔµçÁ¬½Ó×´Ì¬µÄÍ¼Æ¬£¨Image×é¼ş£©")]
+    [Header("è„‘ç”µçŠ¶æ€æŒ‡ç¤ºç¯")]
     public Image eegStatusImage;
-    public Color connectedColor = Color.green; // Á¬½Ó³É¹¦ÏÔÊ¾µÄÑÕÉ«
-    public Color disconnectedColor = Color.red; // ¶Ï¿ª»òÎ´Á¬½ÓÏÔÊ¾µÄÑÕÉ«
+    public Color connectedColor = Color.green;
+    public Color disconnectedColor = Color.red;
 
-    [System.Serializable]
-    public class EEGResponse
-    {
-        public string status;
-        public string message;
-        public string error;
-    }
+    public float eegTimeoutSeconds = 3.0f;
+    private float lastEEGDataTime = -999f;
+
+    [HideInInspector]
+    public bool isEEGConnected = false;
+
+    void Awake() { if (Instance == null) Instance = this; }
 
     void Start()
     {
-        GameObject eyeTrackerPrefab = GameObject.Find("ASeeTracker");
-        if (eyeTrackerPrefab != null)
-        {
-            eyeTrackerController = eyeTrackerPrefab.GetComponent<EyeTrackerController>();
-            Debug.Log($"eyeTrackerController is_tracing:{eyeTrackerController.is_tracing}");
-        }
-        else
-        {
-            Debug.LogError("Î´ÕÒµ½ ASeeTracker ÎïÌå£¬Çë¼ì²é³¡¾°£¡");
-        }
-
-        // ¡ï¡ï¡ï ¼àÌı Toggle ±ä»¯ ¡ï¡ï¡ï
         if (fastModeToggle != null)
         {
             fastModeToggle.onValueChanged.AddListener(OnFastModeChanged);
-            // ³õÊ¼»¯£º¸ù¾İµ±Ç°¹´Ñ¡×´Ì¬ÉèÖÃÍ¼Æ¬
             OnFastModeChanged(fastModeToggle.isOn);
         }
 
-        // ¡ï ³õÊ¼»¯×´Ì¬ÑÕÉ« ¡ï
-        UpdateEEGStatusUI(false);
+        if (debugModeToggle != null)
+        {
+            debugModeToggle.onValueChanged.AddListener(OnDebugModeChanged);
+            OnDebugModeChanged(debugModeToggle.isOn);
+        }
 
+        UpdateEEGStatusUI(false);
         ResetAllWarnings();
     }
 
-    // ¡ï¡ï¡ï Toggle »Øµ÷£ºÇĞ»»Í¼Æ¬ ¡ï¡ï¡ï
     void OnFastModeChanged(bool isOn)
     {
-        if (eyeTrackerController != null)
-        {
-            eyeTrackerController.SetGazePointSprite(isOn);
-        }
+        if (EyeTrackerController_prefab.Instance != null)
+            EyeTrackerController_prefab.Instance.SetGazePointSprite(isOn);
     }
 
-    //¸üĞÂUIÑÕÉ«
+    void OnDebugModeChanged(bool isOn)
+    {
+        if (EyeTrackerController_prefab.Instance != null)
+            EyeTrackerController_prefab.Instance.isDebugMode = isOn;
+
+        if (isOn && WraningUI_4 != null) WraningUI_4.SetActive(false);
+    }
+
     private void UpdateEEGStatusUI(bool isConnected)
     {
-        if (eegStatusImage != null)
+        if (eegStatusImage != null) eegStatusImage.color = isConnected ? connectedColor : disconnectedColor;
+    }
+
+    public void OnReceiveEEGData()
+    {
+        lastEEGDataTime = Time.time;
+        if (!isEEGConnected)
         {
-            eegStatusImage.color = isConnected ? connectedColor : disconnectedColor;
+            isEEGConnected = true;
+            UpdateEEGStatusUI(true);
+            if (WraningUI_4) WraningUI_4.SetActive(false);
         }
     }
 
     void Update()
     {
-
-    }
-
-    // ==========================================
-    // EEG Á¬½ÓÂß¼­
-    // ==========================================
-    public void OnClickConnectEEG()
-    {
-        // ¡ï¡ï¡ï ĞÂÔö£ºÈç¹ûÒÑ¾­Á¬½Ó³É¹¦£¨ÂÌµÆ×´Ì¬£©£¬Ö±½ÓÀ¹½Ø£¬²»ÔÙ·¢ËÍÈÎºÎÇëÇó ¡ï¡ï¡ï
-        if (isEEGConnected)
+        if (isEEGConnected && Time.time - lastEEGDataTime > eegTimeoutSeconds)
         {
-            Debug.Log("ÄÔµçÒÑ³É¹¦Á¬½Ó£¬Îª·ÀÖ¹Bug£¬À¹½ØÖØ¸´ÇëÇó¡£");
-            // Èç¹ûÄãÏëµÄ»°£¬Ò²¿ÉÒÔÔÚÕâÀïµ¯³öÒ»¸öÌáÊ¾UI£¬±ÈÈç£ºWraningUI_3.SetActive(true);
-            return;
-        }
-
-        // Èç¹ûÕıÔÚÁ¬½ÓÖĞ£¬Ö±½ÓºöÂÔµã»÷£¬·ÀÖ¹ÖØ¸´ÇëÇó
-        if (isConnecting)
-        {
-            Debug.Log("ÕıÔÚÁ¬½ÓÖĞ£¬ÇëÉÔºò...");
-            return;
-        }
-
-        //µã»÷°´Å¥Ê±ÏÔÊ¾¡°ÕıÔÚÁ¬½Ó¡±(Warning_5)
-        if (WraningUI_5) WraningUI_5.SetActive(true);
-
-        StartCoroutine(PostConnectEEG());
-    }
-
-    IEnumerator PostConnectEEG()
-    {
-        // ±ê¼ÇÎªÕıÔÚÁ¬½Ó
-        isConnecting = true;
-
-        string jsonData = $"{{\"device_name\": \"{EEG_DEVICE_NAME}\"}}";
-        // »ñÈ¡µ±Ç°Ó¦¸ÃÊ¹ÓÃµÄ URL
-        string targetUrl = CurrentEegApiUrl;
-
-        using (UnityWebRequest request = new UnityWebRequest(targetUrl, "POST"))
-        {
-            byte[] bodyRaw = System.Text.Encoding.UTF8.GetBytes(jsonData);
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            Debug.Log($"ÕıÔÚÁ¬½ÓEEG·şÎñÆ÷: {targetUrl} ...");
-            yield return request.SendWebRequest();
-
-            if (WraningUI_5) WraningUI_5.SetActive(false);
-            // ÇëÇó½áÊø£¨ÎŞÂÛ³É¹¦Ê§°Ü£©£¬½â³ıËø¶¨£¬ÔÊĞíÔÙ´Îµã»÷ÖØÊÔ
-            isConnecting = false;
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                Debug.Log("EEG·şÎñÆ÷ÏìÓ¦: " + request.downloadHandler.text);
-                EEGResponse response = JsonUtility.FromJson<EEGResponse>(request.downloadHandler.text);
-
-                if (response != null && response.status == "connected")
-                {
-                    isEEGConnected = true;
-                    UpdateEEGStatusUI(true); //±äÂÌ
-                    if (WraningUI_3) WraningUI_3.SetActive(true);
-                }
-                else
-                {
-                    // ÒµÎñÂß¼­Ê§°Ü£¨Á¬ÉÏÁË·şÎñÆ÷µ«·µ»Øfailed£©
-                    isEEGConnected = false;
-                    UpdateEEGStatusUI(false); //±äºì
-                    if (WraningUI_4) WraningUI_4.SetActive(true);
-                    Debug.LogWarning("EEGÁ¬½ÓÂß¼­Ê§°Ü: " + (response != null ? response.error : "Unknown Error"));
-                }
-            }
-            else
-            {
-                // ÍøÂçÍ¨ĞÅ±¾ÉíÊ§°Ü
-                isEEGConnected = false;
-                UpdateEEGStatusUI(false); //±äºì
-                if (WraningUI_4) WraningUI_4.SetActive(true);
-                Debug.Log("EEGÍøÂçÇëÇó´íÎó: " + request.error);
-            }
+            isEEGConnected = false;
+            UpdateEEGStatusUI(false);
         }
     }
 
-    public void CloseWarningUI_3()
+    public void CloseWarningUI_3() { if (WraningUI_3) WraningUI_3.SetActive(false); }
+    public void CloseWarningUI_4() { if (WraningUI_4) WraningUI_4.SetActive(false); }
+
+    // â˜… è¡¥å›ç¼ºå¤±çš„è¾…åŠ©å‡½æ•°
+    private void ResetAllWarnings()
     {
         if (WraningUI_3) WraningUI_3.SetActive(false);
-    }
-
-    public void CloseWarningUI_4()
-    {
         if (WraningUI_4) WraningUI_4.SetActive(false);
-        // ¹Ø±ÕÊ§°Ü´°¿Úºó£¬ÓÃ»§¿ÉÒÔÔÙ´Îµã»÷ EEG °´Å¥£¬ÉÏÃæµÄÂß¼­»áÖØĞÂÖ´ĞĞ
     }
 
-    // ==========================================
-    // Á÷³Ì¿ØÖÆÂß¼­
-    // ==========================================
-
-    public void StartCalibration()
-    {
-        // Èç¹ûÓÃ»§µãÁË±ê¶¨°´Å¥£¬Ç¿ÖÆÈ¡Ïû¿ìËÙÄ£Ê½
-        if (fastModeToggle != null && fastModeToggle.isOn)
-        {
-            fastModeToggle.isOn = false;
-            // Õâ»á×Ô¶¯´¥·¢ OnFastModeChanged(false)£¬°Ñ×¢ÊÓµãÍ¼Æ¬»»»ØÀ´
-            Debug.Log("ÓÃ»§µã»÷ÊÖ¶¯±ê¶¨£¬×Ô¶¯¹Ø±Õ¿ìËÙÄ£Ê½");
-        }
-
-        if (eyeTrackerController.ASeeTrackerStart() != 0)
-        {
-            StartCoroutine(ShowWarningForSeconds(WraningUI_1, 1.5f));
-            return;
-        }
-
-        Debug.Log("½øÈëĞ£×¼Á÷³Ì");
-        StartUI.SetActive(false);
-        //SettingUI.SetActive(true);
-        // 3. ¿ªÊ¼Ğ£×¼£¬²¢´«Èë¡°Íê³Éºó»Øµ½ Start ½çÃæ¡±µÄÂß¼­
-        eyeTrackerController.startCalibration(() =>
-        {
-            Debug.Log("ÊÕµ½Ğ£×¼Íê³É»Øµ÷£¬ÖØÖÃ UI");
-
-            // ¡ï¡ï¡ï ĞŞ¸´¹Ø¼üµã£ºĞ£×¼Íêºó£¬±ØĞë¹Ø±ÕÑÛ¶¯ÒÇ·şÎñ ¡ï¡ï¡ï
-            // ·ñÔò»Øµ½Start½çÃæºó£¬ÏÂ´Îµã»÷TrainÔÙ´Îµ÷ÓÃStart()»á±¨´íµ¼ÖÂ Warning_1
-            if (eyeTrackerController != null)
-            {
-                eyeTrackerController.ASeeTrackerStop();
-            }
-
-            // Ğ£×¼½áÊø£¬ÖØĞÂÏÔÊ¾ Start ½çÃæ
-            if (StartUI != null) StartUI.SetActive(true);
-
-            // È·±£ SettingUI ÊÇ¹Ø±ÕµÄ
-            if (SettingUI != null) SettingUI.SetActive(false);
-        });
-    }
-
-    private IEnumerator ShowWarningForSeconds(GameObject WarningUI, float seconds)
-    {
-        WarningUI.SetActive(true);
-        yield return new WaitForSeconds(seconds);
-        WarningUI.SetActive(false);
-    }
-
-    public void Set_WarningUI_1_Show()
-    {
-        WraningUI_1.SetActive(!WraningUI_1.activeSelf);
-    }
-
-    public void Set_WarningUI_2_Show()
-    {
-        WraningUI_2.SetActive(!WraningUI_2.activeSelf);
-        eyeTrackerController.startCalibration();
-    }
-
-    public void Set_WarningUI_2_ShowCancle()
-    {
-        WraningUI_2.SetActive(!WraningUI_2.activeSelf);
-    }
-
-    // Train °´Å¥Âß¼­
     public void EnableSetting()
     {
-        // 1. ¼ì²éEEGÊÇ·ñÁ¬½Ó
-        if (!isEEGConnected)
+        bool isDebug = debugModeToggle != null && debugModeToggle.isOn;
+
+        // å¼ºåˆ¶å‘ä¸‹åŒæ­¥ä¸€æ¬¡æ¨¡å¼ï¼Œé˜²æ­¢è¿›å…¥æ—¶é”™ä½
+        if (EyeTrackerController_prefab.Instance != null)
+            EyeTrackerController_prefab.Instance.isDebugMode = isDebug;
+
+        if (!isEEGConnected && !isDebug)
         {
             if (WraningUI_4) WraningUI_4.SetActive(true);
             return;
         }
 
-        // 2. ¼ì²éÑÛ¶¯ÒÇÁ¬½Ó
-        if (eyeTrackerController.ASeeTrackerStart() != 0)
-        {
-            StartCoroutine(ShowWarningForSeconds(WraningUI_1, 1.5f));
-            return;
-        }
+        if (StartUI != null) StartUI.SetActive(false);
 
-        // ¡ï¡ï¡ï ÅĞ¶Ï Toggle£ºÈç¹û¹´Ñ¡£¬Ö±½ÓÌø¹ı Setting ½çÃæ£¬½øÈë Train ¡ï¡ï¡ï
         if (fastModeToggle != null && fastModeToggle.isOn)
         {
-            // 1. ÇåÀíÒ»ÏÂ¾É×´Ì¬£¨·ÀÖ¹ReticleCalibrator²ĞÁô£©
-            if (reticleCalibrator != null) reticleCalibrator.ResetState();
-
-            // 2. ¡ï ºËĞÄĞŞ¸´£ºÇ¿ÖÆÕÒµ½²¢ÏÔÊ¾Ê®×Ö£¬ÇÒÎ»ÖÃ¹éÁã ¡ï
             ForceCenterCross();
-
-            // 3. ¿ªÊ¼ÑµÁ·
             StartTrain();
-            return;
         }
-
-        // 3. ¼ì²éÅäÖÃÎÄ¼ş
-        if (!eyeTrackerController.CheckCoeFile())
+        else
         {
-            WraningUI_2.SetActive(true);
-            return;
-        }
+            if (SettingUI != null) SettingUI.SetActive(true);
 
-        StartUI.SetActive(false);
-        SettingUI.SetActive(true);
+            // é€šçŸ¥æ§åˆ¶å™¨æ˜¾ç¤ºå¹¶è¿½è¸ªåœ†ç¯
+            if (EyeTrackerController_prefab.Instance != null)
+                EyeTrackerController_prefab.Instance.startTrace();
+        }
     }
 
-    // ¡ï¡ï¡ï ĞÂÔö¸¨Öúº¯Êı£ºÇ¿ÖÆ¹éÁã²¢ÏÔÊ¾Ê®×Ö ¡ï¡ï¡ï
     private void ForceCenterCross()
     {
-        GameObject canvas = GameObject.Find("Canvas");
-        if (!canvas) return;
-
-        // 1. ÕÒµ½ UI ¸ù½Úµã
-        Transform aseeUI = canvas.transform.Find("ASeeTracker_UI_Scipr(Clone)");
-        if (!aseeUI) aseeUI = canvas.transform.Find("ASeeTracker_UI_Scipr");
-
-        if (aseeUI)
+        if (EyeTrackerController_prefab.Instance != null && EyeTrackerController_prefab.Instance.gazeDot != null)
         {
-            // 2. ÕÒµ½ GazePoint (Ô²Çò)
-            Transform gazePoint = aseeUI.Find("GazePoint");
-            if (gazePoint)
-            {
-                // È·±£Ô²Çò±¾ÉíÊÇÏÔÊ¾µÄ£¨Í¨³£ÊÇÏÔÊ¾µÄ£¬µ«±£ÏÕÆğ¼û£©
-                gazePoint.gameObject.SetActive(true);
-
-                // 3. ÕÒµ½ targetCross (Ê®×Ö)
-                // ×¢Òâ£º¸ù¾İÖ®Ç°µÄ´úÂë£¬targetCross ÊÇ GazePoint µÄ×ÓÎïÌå
-                Transform targetCross = gazePoint.Find("targetCross");
-
-                // Èç¹ûÕÒ²»µ½£¬³¢ÊÔÉî¶ÈËÑË÷£¨·ÀÖ¹²ã¼¶±ä¶¯£©
-                if (!targetCross)
-                {
-                    foreach (Transform t in gazePoint) if (t.name == "targetCross") targetCross = t;
-                }
-
-                if (targetCross)
-                {
-                    // ¡ï Ç¿ÖÆÏÔÊ¾ ¡ï
-                    targetCross.gameObject.SetActive(true);
-
-                    // ¡ï Ç¿ÖÆÎ»ÖÃ¹éÁã (¾ÓÖĞ) ¡ï
-                    RectTransform rt = targetCross.GetComponent<RectTransform>();
-                    if (rt) rt.anchoredPosition = Vector2.zero;
-
-                    Debug.Log("¿ìËÙÄ£Ê½£ºÊ®×ÖÒÑÇ¿ÖÆ¹éÎ»²¢ÏÔÊ¾");
-                }
-                else
-                {
-                    Debug.LogWarning("¿ìËÙÄ£Ê½£ºÎ´ÕÒµ½ targetCross£¬Çë¼ì²é Prefab ²ã¼¶£¡");
-                }
-            }
+            Transform tc = EyeTrackerController_prefab.Instance.gazeDot.transform.Find("targetCross");
+            if (tc) tc.GetComponent<RectTransform>().anchoredPosition = Vector2.zero;
         }
     }
 
     public void StartTrain()
     {
-        StartUI.SetActive(false);
-        SettingUI.SetActive(false);
-        TrainUI.SetActive(true);
-        eyeTrackerController.startTrace();
+        if (StartUI != null) StartUI.SetActive(false);
+        if (SettingUI != null) SettingUI.SetActive(false);
+        if (TrainUI != null) TrainUI.SetActive(true);
+
+        // é€šçŸ¥æ§åˆ¶å™¨æ˜¾ç¤ºå¹¶è¿½è¸ªåœ†ç¯
+        if (EyeTrackerController_prefab.Instance != null)
+        {
+            EyeTrackerController_prefab.Instance.startTrace();
+        }
     }
 
-    // ·µ»Ø Start ½çÃæ
     public void BackToStart()
     {
-        Debug.Log("·µ»ØÖ÷½çÃæ£¬ÕıÔÚ³¹µ×¹Ø±ÕÑÛ¶¯ÒÇ·şÎñ²¢ÖØÖÃ×´Ì¬...");
-        // 1. Í£Ö¹ÑÛ¶¯ÒÇ (ÕâÊÇ¹Ø¼ü)
-        // µ÷ÓÃÄãÔÚ EyeTrackerController.cs ÀïĞ´ºÃµÄ ASeeTrackerStop()
-        // Õâ¸ö·½·¨»á£ºif (is_tracing) stopTrace(); -> running=false -> _7i_stop() -> handle.Free()
-        if (eyeTrackerController != null)
+        if (EyeTrackerController_prefab.Instance != null)
         {
-            eyeTrackerController.ASeeTrackerStop();
+            EyeTrackerController_prefab.Instance.stopTrace();
         }
 
-        ResetGazePointPosition();
-
-        // 2. ÖØÖÃ EEG Á¬½Ó×´Ì¬ (Ç¿ÖÆÓÃ»§±ØĞëÖØĞÂµãÁ¬½Ó)
-        //isEEGConnected = false;
-        isConnecting = false;
-
-        // ¡ï¡ï¡ï 3. ÖØÖÃµã»÷Æ«ÒÆĞ£Ñé (ĞÂÔö) ¡ï¡ï¡ï
-        if (reticleCalibrator != null)
-        {
-            reticleCalibrator.ResetState();
-        }
-
-        // 3. UI ÇĞ»»£º¹Ø±ÕÓÎÏ·ºÍÉèÖÃ£¬»Øµ½¿ªÊ¼
         if (TrainUI != null) TrainUI.SetActive(false);
         if (SettingUI != null) SettingUI.SetActive(false);
         if (StartUI != null) StartUI.SetActive(true);
 
-        // 4. ¹Ø±ÕËùÓĞ²ĞÁôµÄµ¯´°
         ResetAllWarnings();
-
-        // ·µ»Ø½çÃæÊ±£¬¸ù¾İµ±Ç°±£´æµÄ×´Ì¬Ë¢ĞÂÒ»ÏÂUIÑÕÉ«£¨ÒÔ·ÀÍòÒ»£©
-        UpdateEEGStatusUI(isEEGConnected);
-    }
-
-    // ·µ»ØÊ±Ñ°ÕÒ²¢¹éÎ»×¢ÊÓµã GazePoint 
-    private void ResetGazePointPosition()
-    {
-        // 1. ÕÒµ½ Canvas
-        GameObject canvas = GameObject.Find("Canvas");
-        if (!canvas) return;
-
-        // 2. ÕÒµ½ ASeeTracker UI (Clone »ò Ô­Ãû)
-        Transform aseeUI = canvas.transform.Find("ASeeTracker_UI_Scipr(Clone)");
-        if (!aseeUI) aseeUI = canvas.transform.Find("ASeeTracker_UI_Scipr");
-
-        if (aseeUI)
-        {
-            // 3. ÕÒµ½ GazePoint (Ğ¡Çò)
-            Transform gazePoint = aseeUI.Find("GazePoint");
-            if (gazePoint)
-            {
-                RectTransform rt = gazePoint.GetComponent<RectTransform>();
-                if (rt)
-                {
-                    // Ç¿ÖÆ¹éÁã (ÆÁÄ»ÖĞĞÄ)
-                    rt.anchoredPosition = Vector2.zero;
-                    Debug.Log("GazePoint ÒÑÇ¿ÖÆ¹éÎ»µ½ÖĞĞÄ");
-                }
-            }
-        }
-    }
-
-    private void ResetAllWarnings()
-    {
-        if (WraningUI_1) WraningUI_1.SetActive(false);
-        if (WraningUI_2) WraningUI_2.SetActive(false);
-        if (WraningUI_3) WraningUI_3.SetActive(false);
-        if (WraningUI_4) WraningUI_4.SetActive(false);
-        if (WraningUI_5) WraningUI_5.SetActive(false);
     }
 
     public void QuitGame()
     {
 #if UNITY_EDITOR
-        EditorApplication.ExitPlaymode();
+        UnityEditor.EditorApplication.ExitPlaymode();
 #else
         Application.Quit();
 #endif
